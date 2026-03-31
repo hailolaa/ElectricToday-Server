@@ -1,0 +1,147 @@
+{
+  "info": {
+    "name": "SMT Backend",
+    "_postman_id": "a1a5f57f-c510-4ed8-905d-9bce4658a01a",
+    "description": "Core SMT backend integration flow with session-based requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "apiKey", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "username", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "esiid", "value": "" },
+    { "key": "meterNumber", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Provider",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "url": "{{baseUrl}}/api/smt/provider"
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"rememberMe\": \"true\",\n  \"ESIID\": \"{{esiid}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json?.meta?.sessionId) {",
+              "  pm.collectionVariables.set('sessionId', json.meta.sessionId);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usage (Latest ODR)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ESIID\": \"{{esiid}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/usage"
+      }
+    },
+    {
+      "name": "Meter Read Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ESIID\": \"{{esiid}}\",\n  \"MeterNumber\": \"{{meterNumber}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/meter-read/request"
+      }
+    },
+    {
+      "name": "Meter Read Status",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ESIID\": \"{{esiid}}\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/meter-read/status"
+      }
+    },
+    {
+      "name": "Usage History Daily",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ESIID\": \"{{esiid}}\",\n  \"granularity\": \"daily\",\n  \"startDate\": \"03/26/2026\",\n  \"endDate\": \"03/26/2026\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/usage/history"
+      }
+    },
+    {
+      "name": "Usage History Monthly",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ESIID\": \"{{esiid}}\",\n  \"granularity\": \"monthly\",\n  \"startDate\": \"04/01/2024\",\n  \"endDate\": \"03/31/2026\"\n}"
+        },
+        "url": "{{baseUrl}}/api/smt/usage/history"
+      }
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{apiKey}}" },
+          { "key": "x-smt-session-id", "value": "{{sessionId}}" }
+        ],
+        "url": "{{baseUrl}}/api/smt/logout"
+      }
+    }
+  ]
+}
