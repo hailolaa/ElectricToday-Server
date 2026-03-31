@@ -69,7 +69,7 @@ function runMigrations(db) {
       id                    INTEGER PRIMARY KEY AUTOINCREMENT,
       smt_username          TEXT    NOT NULL,
       smt_password_enc      TEXT    NOT NULL,
-      esiid                 TEXT    NOT NULL,
+      esiid                 TEXT,
       meter_number          TEXT,
       created_at            TEXT    DEFAULT (datetime('now')),
       updated_at            TEXT    DEFAULT (datetime('now')),
@@ -115,6 +115,35 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_odr_attempts_esiid
       ON odr_attempts(esiid, attempted_at);
   `);
+
+  // ── Migration: make users.esiid nullable (for login-before-onboarding flow) ──
+  // SQLite doesn't support ALTER COLUMN, so we recreate the table if esiid is
+  // still NOT NULL.  We detect this via table_info pragma.
+  const cols = db.pragma("table_info(users)");
+  const esiidCol = cols.find((c) => c.name === "esiid");
+  if (esiidCol && esiidCol.notnull === 1) {
+    db.exec(`
+      PRAGMA foreign_keys = OFF;
+
+      CREATE TABLE users_new (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        smt_username          TEXT    NOT NULL,
+        smt_password_enc      TEXT    NOT NULL,
+        esiid                 TEXT,
+        meter_number          TEXT,
+        created_at            TEXT    DEFAULT (datetime('now')),
+        updated_at            TEXT    DEFAULT (datetime('now')),
+        UNIQUE(smt_username, esiid)
+      );
+
+      INSERT INTO users_new SELECT * FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+
+      PRAGMA foreign_keys = ON;
+    `);
+    console.log("[db] Migration: users.esiid is now nullable.");
+  }
 }
 
 module.exports = { getDb, encrypt, decrypt };

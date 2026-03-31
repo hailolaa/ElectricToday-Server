@@ -162,6 +162,11 @@ async function syncUserDailyUsage(user) {
     return { success: false, reason: "no_credentials" };
   }
 
+  if (!creds.esiid) {
+    // User hasn't completed onboarding yet – skip until ESIID is set.
+    return { success: false, reason: "no_esiid" };
+  }
+
   try {
     // Login to SMT
     const sessionClient =
