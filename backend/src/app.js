@@ -27,6 +27,18 @@ app.use(
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
+      // Allow http://localhost on any port (for Flutter web dev)
+      try {
+        const parsed = new URL(origin);
+        if (
+          parsed.hostname === "localhost" &&
+          allowedOrigins.some((o) => {
+            try { return new URL(o).hostname === "localhost"; } catch { return false; }
+          })
+        ) {
+          return callback(null, true);
+        }
+      } catch { /* invalid origin, fall through to block */ }
       return callback(new Error("CORS origin blocked"));
     },
   })
