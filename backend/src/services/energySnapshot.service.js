@@ -1,6 +1,7 @@
 const dailyUsageModel = require("../models/dailyUsage.model");
 const meterReadModel = require("../models/meterRead.model");
 const userModel = require("../models/user.model");
+const providerModel = require("../models/provider.model");
 const { fmtCentralDate, addDays } = require("../utils/dateUtils");
 
 const DEFAULT_RATE_PER_KWH = Number(process.env.DEFAULT_RATE_PER_KWH || 0.15);
@@ -87,6 +88,19 @@ function _computeTrendData(user) {
   };
 }
 
+function _resolveRateForUser(user) {
+  // If user selected a provider, use its energy_rate_cents; otherwise env default.
+  try {
+    if (user?.provider_name) {
+      const p = providerModel.findByName(user.provider_name);
+      if (p && typeof p.energy_rate_cents === "number") {
+        return Number((p.energy_rate_cents / 100.0).toFixed(4));
+      }
+    }
+  } catch (_) { /* best-effort */ }
+  return DEFAULT_RATE_PER_KWH;
+}
+
 function buildEnergySnapshotForUser(userId) {
   const user = userModel.findById(userId);
   if (!user) return null;
@@ -136,7 +150,7 @@ function buildEnergySnapshotForUser(userId) {
   }
 
   const readAt = latestRead?.read_at || null;
-  const ratePerKwh = DEFAULT_RATE_PER_KWH;
+  const ratePerKwh = _resolveRateForUser(user);
   const totalBudget = DEFAULT_DAILY_BUDGET;
   const currentSpend = kwhToday * ratePerKwh;
   const remainingAmount = Math.max(0, totalBudget - currentSpend);

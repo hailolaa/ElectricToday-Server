@@ -418,6 +418,36 @@ exports.updateEsiid = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/user/provider
+ * Updates the user's selected retail provider.
+ */
+exports.updateProvider = async (req, res) => {
+  try {
+    const user = req.user;
+    const { providerName } = req.body;
+    if (!providerName || typeof providerName !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: { code: "PROVIDER_VALIDATION_ERROR", message: "providerName is required." },
+      });
+    }
+    userModel.updateProviderName(user.id, providerName.trim());
+    return res.json({
+      success: true,
+      data: { providerName: providerName.trim() },
+      meta: { timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "PROVIDER_UPDATE_ERROR",
+        message: error.message || "Failed to update provider.",
+      },
+    });
+  }
+};
 exports.getEnergySnapshot = async (req, res) => {
   try {
     const user = req.user;

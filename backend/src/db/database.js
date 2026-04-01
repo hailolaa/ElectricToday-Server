@@ -114,6 +114,18 @@ function runMigrations(db) {
 
     CREATE INDEX IF NOT EXISTS idx_odr_attempts_esiid
       ON odr_attempts(esiid, attempted_at);
+
+    CREATE TABLE IF NOT EXISTS providers (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      name                 TEXT    NOT NULL UNIQUE,
+      energy_rate_cents    REAL    NOT NULL,      -- e.g., 8.0 means $0.08/kWh
+      avg_all_in_cents     REAL,                  -- e.g., 11.2 means 11.2¢/kWh at 1000 kWh
+      plan_type            TEXT,
+      term_months          INTEGER,
+      cancellation_fee     TEXT,
+      created_at           TEXT    DEFAULT (datetime('now')),
+      updated_at           TEXT    DEFAULT (datetime('now'))
+    );
   `);
 
   // ── Migration: make users.esiid nullable (for login-before-onboarding flow) ──
@@ -143,6 +155,38 @@ function runMigrations(db) {
       PRAGMA foreign_keys = ON;
     `);
     console.log("[db] Migration: users.esiid is now nullable.");
+  }
+
+  // ── Migration: add users.provider_name (nullable) ──
+  const userCols = db.pragma("table_info(users)");
+  const providerNameCol = userCols.find((c) => c.name === "provider_name");
+  if (!providerNameCol) {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN provider_name TEXT;
+    `);
+    console.log("[db] Migration: users.provider_name added.");
+  }
+
+  // ── Seed default providers if table empty ──
+  const hasProviders = db.prepare("SELECT COUNT(1) AS c FROM providers").get().c;
+  if (!hasProviders) {
+    const stmt = db.prepare(`
+      INSERT INTO providers
+        (name, energy_rate_cents, avg_all_in_cents, plan_type, term_months, cancellation_fee)
+      VALUES (?, ?, ?, ?, ?, ?)`);
+    const rows = [
+      ["Gexa Energy", 8.0, 11.2, "Bill Credit", 12, "$150"],
+      ["Cirro Energy", 8.1, 11.5, "Tiered", 12, "$150"],
+      ["TXU Energy", 11.5, 15.1, "Fixed / Free Nights", 12, "$150"],
+      ["Reliant Energy", 11.9, 14.8, "Fixed / Free Weekends", 12, "$150"],
+      ["Direct Energy", 14.9, 16.5, "Simple Fixed", 12, "$135"],
+      ["Green Mountain", 12.3, 15.9, "100% Renewable", 12, "$150"],
+    ];
+    const tx = db.transaction(() => {
+      rows.forEach((r) => stmt.run(...r));
+    });
+    tx();
+    console.log("[db] Seeded default providers.");
   }
 }
 

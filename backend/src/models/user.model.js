@@ -8,7 +8,7 @@ const { getDb, encrypt, decrypt } = require("../db/database");
  *      without ESIID initially and later provided one during onboarding)
  * If found, update password + optionally ESIID/meter. Otherwise insert.
  */
-function upsertUser({ smtUsername, smtPassword, esiid, meterNumber }) {
+function upsertUser({ smtUsername, smtPassword, esiid, meterNumber, providerName }) {
   const db = getDb();
   const enc = encrypt(smtPassword);
 
@@ -28,18 +28,19 @@ function upsertUser({ smtUsername, smtPassword, esiid, meterNumber }) {
           SET smt_password_enc = ?,
               esiid = COALESCE(?, esiid),
               meter_number = COALESCE(?, meter_number),
+              provider_name = COALESCE(?, provider_name),
               updated_at = datetime('now')
         WHERE id = ?`
-    ).run(enc, esiid || null, meterNumber || null, existing.id);
+    ).run(enc, esiid || null, meterNumber || null, providerName || null, existing.id);
     return { id: existing.id, created: false };
   }
 
   const info = db
     .prepare(
-      `INSERT INTO users (smt_username, smt_password_enc, esiid, meter_number)
-       VALUES (?, ?, ?, ?)`
+      `INSERT INTO users (smt_username, smt_password_enc, esiid, meter_number, provider_name)
+       VALUES (?, ?, ?, ?, ?)`
     )
-    .run(smtUsername, enc, esiid || null, meterNumber || null);
+    .run(smtUsername, enc, esiid || null, meterNumber || null, providerName || null);
 
   return { id: info.lastInsertRowid, created: true };
 }
@@ -69,6 +70,7 @@ function getSmtCredentials(userId) {
     password: decrypt(user.smt_password_enc),
     esiid: user.esiid,
     meterNumber: user.meter_number,
+    providerName: user.provider_name,
   };
 }
 
@@ -88,6 +90,12 @@ function updateEsiid(userId, esiid) {
     .run(esiid, userId);
 }
 
+function updateProviderName(userId, providerName) {
+  getDb()
+    .prepare(`UPDATE users SET provider_name = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(providerName, userId);
+}
+
 module.exports = {
   upsertUser,
   findById,
@@ -96,4 +104,5 @@ module.exports = {
   getSmtCredentials,
   updateMeterNumber,
   updateEsiid,
+  updateProviderName,
 };

@@ -12,5 +12,6 @@ router.get("/energy/snapshot", userController.getEnergySnapshot);
 router.get("/meter-reads", userController.getMeterReads);
 router.get("/odr-rate-limit", userController.getOdrRateLimit);
 router.put("/esiid", userController.updateEsiid);
+router.put("/provider", userController.updateProvider);
 
 module.exports = router;
