@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const providerController = require("../controllers/provider.controller");
-const apiKeyAuth = require("../middleware/apiKeyAuth.middleware");
+const { apiKeyAuth } = require("../middleware/apiKeyAuth.middleware");
 
 // Public endpoints for reading provider data
 router.get("/", providerController.listProviders);
