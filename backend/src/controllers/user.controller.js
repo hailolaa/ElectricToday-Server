@@ -281,10 +281,16 @@ exports.getEnergyTrends = async (req, res) => {
     const yesterdayKwh = latestDayUsage.totalKwh;
     const priorDayKwh = priorDayUsage.totalKwh;
 
-    // kwhTrend: (yesterday - dayBefore) / dayBefore
+    // kwhTrend: (yesterday - dayBefore) / dayBefore, with edge-case handling
     let kwhTrend = 0;
     if (priorDayKwh > 0) {
       kwhTrend = (yesterdayKwh - priorDayKwh) / priorDayKwh;
+    } else if (priorDayKwh === 0 && yesterdayKwh > 0) {
+      // From zero to some usage = +100%
+      kwhTrend = 1.0;
+    } else if (priorDayKwh > 0 && yesterdayKwh === 0) {
+      // From some usage to zero = -100%
+      kwhTrend = -1.0;
     }
 
     // 2. Week-over-week: this-week avg daily vs last-week avg daily
@@ -315,15 +321,15 @@ exports.getEnergyTrends = async (req, res) => {
       costTrend = (thisWeekAvgDaily - lastWeekAvgDaily) / lastWeekAvgDaily;
     }
 
-    // 3. percentVsYesterday: current spend vs yesterday's spend
-    //    Since we may not have today's full data, compare latest day vs prior day
-    //    (same as kwhTrend for now but expressed as spend change)
-    const RATE = 0.15;
-    const todaySpend = yesterdayKwh * RATE;
-    const yesterdaySpend = priorDayKwh * RATE;
+    // 3. percentVsYesterday: use kWh-based percent to avoid rate skew;
+    //    identical to kwhTrend with the same edge-case handling.
     let percentVsYesterday = 0;
-    if (yesterdaySpend > 0) {
-      percentVsYesterday = (todaySpend - yesterdaySpend) / yesterdaySpend;
+    if (priorDayKwh > 0) {
+      percentVsYesterday = (yesterdayKwh - priorDayKwh) / priorDayKwh;
+    } else if (priorDayKwh === 0 && yesterdayKwh > 0) {
+      percentVsYesterday = 1.0;
+    } else if (priorDayKwh > 0 && yesterdayKwh === 0) {
+      percentVsYesterday = -1.0;
     }
 
     res.json({
