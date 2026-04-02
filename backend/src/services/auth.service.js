@@ -22,6 +22,9 @@ function registerOrUpdate({ smtUsername, smtPassword, esiid, meterNumber }) {
     meterNumber,
   });
 
+  // Successful login/registration → reset any sync failure state
+  userModel.resetSyncFailures(id);
+
   const token = signToken(id);
   return { userId: id, token, created };
 }
@@ -37,6 +40,9 @@ function loginExisting({ smtUsername, smtPassword, esiid }) {
     smtPassword,
     esiid,
   });
+
+  // Successful login → reset any sync failure state so sync resumes
+  userModel.resetSyncFailures(id);
 
   const token = signToken(id);
   return { userId: id, token };

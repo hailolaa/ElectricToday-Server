@@ -148,6 +148,11 @@ async function fetchAndStoreDailyUsage({
 // Used by the background job.
 // ---------------------------------------------------------------------------
 async function syncUserDailyUsage(user) {
+  // Skip users whose sync has been auto-disabled after repeated failures
+  if (userModel.isSyncDisabled(user.id)) {
+    return { success: false, reason: "sync_disabled" };
+  }
+
   const providerName = getProviderName();
   const provider = getSmtProvider();
 
@@ -186,18 +191,27 @@ async function syncUserDailyUsage(user) {
       loginResult?.accessToken || loginResult?.data?.token;
     if (!accessToken) {
       console.warn(`[sync] No access token for user ${user.id}`);
+      userModel.incrementSyncFailures(user.id);
       return { success: false, reason: "no_token" };
     }
 
-    return fetchAndStoreDailyUsage({
+    const result = await fetchAndStoreDailyUsage({
       userId: user.id,
       esiid: creds.esiid,
       meterNumber: creds.meterNumber,
       accessToken,
       session: loginResult?.session || null,
     });
+
+    // Success – reset failure counter so future transient errors get a fresh budget
+    if (result.success) {
+      userModel.resetSyncFailures(user.id);
+    }
+
+    return result;
   } catch (error) {
-    console.error(`[sync] User ${user.id} sync failed:`, error.message);
+    userModel.incrementSyncFailures(user.id);
+    console.error(`[sync] User ${user.id} sync failed (failures: ${user.sync_fail_count + 1}):`, error.message);
     return { success: false, reason: error.message };
   }
 }
@@ -206,8 +220,8 @@ async function syncUserDailyUsage(user) {
 // Sync all users
 // ---------------------------------------------------------------------------
 async function syncAllUsers() {
-  const users = userModel.getAllUsers();
-  console.log(`[sync] Starting sync for ${users.length} user(s)...`);
+  const users = userModel.getSyncableUsers();
+  console.log(`[sync] Starting sync for ${users.length} syncable user(s)...`);
 
   const results = [];
   for (const user of users) {

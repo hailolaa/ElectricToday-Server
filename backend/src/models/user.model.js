@@ -96,6 +96,53 @@ function updateProviderName(userId, providerName) {
     .run(providerName, userId);
 }
 
+// ── Sync failure tracking ──
+
+const MAX_SYNC_FAILURES = 5;
+
+function incrementSyncFailures(userId) {
+  const db = getDb();
+  db.prepare(
+    `UPDATE users
+        SET sync_fail_count = sync_fail_count + 1,
+            updated_at = datetime('now')
+      WHERE id = ?`
+  ).run(userId);
+
+  // Auto-disable sync after MAX_SYNC_FAILURES consecutive failures
+  const user = db.prepare("SELECT sync_fail_count FROM users WHERE id = ?").get(userId);
+  if (user && user.sync_fail_count >= MAX_SYNC_FAILURES) {
+    db.prepare(
+      `UPDATE users
+          SET sync_disabled_at = datetime('now'),
+              updated_at = datetime('now')
+        WHERE id = ? AND sync_disabled_at IS NULL`
+    ).run(userId);
+    console.log(`[sync] User ${userId}: disabled after ${user.sync_fail_count} consecutive failures.`);
+  }
+}
+
+function resetSyncFailures(userId) {
+  getDb().prepare(
+    `UPDATE users
+        SET sync_fail_count = 0,
+            sync_disabled_at = NULL,
+            updated_at = datetime('now')
+      WHERE id = ?`
+  ).run(userId);
+}
+
+function isSyncDisabled(userId) {
+  const user = getDb().prepare("SELECT sync_disabled_at FROM users WHERE id = ?").get(userId);
+  return !!(user && user.sync_disabled_at);
+}
+
+function getSyncableUsers() {
+  return getDb()
+    .prepare("SELECT * FROM users WHERE sync_disabled_at IS NULL")
+    .all();
+}
+
 module.exports = {
   upsertUser,
   findById,
@@ -105,4 +152,8 @@ module.exports = {
   updateMeterNumber,
   updateEsiid,
   updateProviderName,
+  incrementSyncFailures,
+  resetSyncFailures,
+  isSyncDisabled,
+  getSyncableUsers,
 };

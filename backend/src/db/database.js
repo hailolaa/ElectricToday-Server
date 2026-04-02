@@ -167,6 +167,16 @@ function runMigrations(db) {
     console.log("[db] Migration: users.provider_name added.");
   }
 
+  // ── Migration: add sync failure tracking columns ──
+  const userCols2 = db.pragma("table_info(users)");
+  if (!userCols2.find((c) => c.name === "sync_fail_count")) {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN sync_fail_count INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN sync_disabled_at TEXT;
+    `);
+    console.log("[db] Migration: added sync_fail_count & sync_disabled_at to users.");
+  }
+
   // ── Seed default providers if table empty ──
   const hasProviders = db.prepare("SELECT COUNT(1) AS c FROM providers").get().c;
   if (!hasProviders) {
