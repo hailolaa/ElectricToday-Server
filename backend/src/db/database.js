@@ -177,10 +177,20 @@ function runMigrations(db) {
     const rows = [
       ["Gexa Energy", 8.0, 11.2, "Bill Credit", 12, "$150"],
       ["Cirro Energy", 8.1, 11.5, "Tiered", 12, "$150"],
-      ["TXU Energy", 11.5, 15.1, "Fixed / Free Nights", 12, "$150"],
+      ["4Change Energy", 8.3, 10.9, "Value Fixed", 12, "$135"],
+      ["Rhythm Energy", 8.4, 11.0, "100% Renewable", 12, "$0"],
+      ["Champion Energy", 8.6, 11.3, "Fixed", 12, "$150"],
+      ["Discount Power", 8.7, 11.4, "Fixed", 12, "$150"],
+      ["Amigo Energy", 8.8, 11.6, "Fixed", 12, "$150"],
+      ["Payless Power", 8.9, 12.2, "Prepaid", 1, "$0"],
+      ["First Choice Power", 9.0, 11.8, "Fixed", 12, "$150"],
+      ["Just Energy", 9.2, 12.1, "Fixed Green", 12, "$175"],
+      ["TriEagle Energy", 9.3, 11.7, "Fixed", 24, "$200"],
+      ["Spark Energy", 9.4, 12.0, "Fixed", 12, "$150"],
       ["Reliant Energy", 11.9, 14.8, "Fixed / Free Weekends", 12, "$150"],
-      ["Direct Energy", 14.9, 16.5, "Simple Fixed", 12, "$135"],
+      ["TXU Energy", 11.5, 15.1, "Fixed / Free Nights", 12, "$150"],
       ["Green Mountain", 12.3, 15.9, "100% Renewable", 12, "$150"],
+      ["Direct Energy", 14.9, 16.5, "Simple Fixed", 12, "$135"],
     ];
     const tx = db.transaction(() => {
       rows.forEach((r) => stmt.run(...r));
