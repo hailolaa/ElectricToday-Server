@@ -3,6 +3,7 @@ const { URL } = require("url");
 const { verifyToken } = require("../services/auth.service");
 const userModel = require("../models/user.model");
 const { buildEnergySnapshotForUser } = require("../services/energySnapshot.service");
+const notificationModel = require("../models/notification.model");
 
 const USER_SOCKETS = new Map(); // userId -> Set<WebSocket>
 const USER_SEQ = new Map(); // userId -> number
@@ -164,6 +165,15 @@ function initWsGateway(httpServer, { allowedOrigins = [] } = {}) {
     });
 
     await pushLatestEnergySnapshot(userId, "connected");
+
+    // Push initial notification count so the app badge updates immediately
+    try {
+      const unreadCount = notificationModel.countUnread(userId);
+      pushUserEvent(userId, "notifications_changed", {
+        reason: "connected",
+        data: { unreadCount },
+      });
+    } catch (_) { /* best-effort */ }
   });
 
   heartbeatTimer = setInterval(() => {

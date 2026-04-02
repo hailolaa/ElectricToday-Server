@@ -126,6 +126,43 @@ function runMigrations(db) {
       created_at           TEXT    DEFAULT (datetime('now')),
       updated_at           TEXT    DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL,
+      type            TEXT    NOT NULL,           -- high_usage | budget_exceeded | weekly_summary | usage_spike | better_provider | sync_failed | bill_estimate | daily_summary
+      title           TEXT    NOT NULL,
+      body            TEXT    NOT NULL,
+      priority        TEXT    NOT NULL DEFAULT 'normal',  -- low | normal | high | critical
+      read            INTEGER NOT NULL DEFAULT 0,
+      dismissed       INTEGER NOT NULL DEFAULT 0,
+      metadata        TEXT,                       -- JSON blob for extra data
+      created_at      TEXT    DEFAULT (datetime('now')),
+      expires_at      TEXT,                       -- optional TTL
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+      ON notifications(user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
+      ON notifications(user_id, read, dismissed);
+
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id         INTEGER NOT NULL UNIQUE,
+      high_usage      INTEGER NOT NULL DEFAULT 1,
+      budget_alert    INTEGER NOT NULL DEFAULT 1,
+      weekly_summary  INTEGER NOT NULL DEFAULT 1,
+      usage_spike     INTEGER NOT NULL DEFAULT 1,
+      better_provider INTEGER NOT NULL DEFAULT 1,
+      daily_summary   INTEGER NOT NULL DEFAULT 0,
+      bill_estimate   INTEGER NOT NULL DEFAULT 1,
+      daily_budget    REAL    NOT NULL DEFAULT 8.0,   -- $ daily budget threshold
+      spike_threshold REAL    NOT NULL DEFAULT 2.0,   -- multiplier vs 7-day avg
+      updated_at      TEXT    DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   // ── Migration: make users.esiid nullable (for login-before-onboarding flow) ──

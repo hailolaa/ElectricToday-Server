@@ -5,6 +5,14 @@ const { getSmtProvider, getProviderName } = require("../providers/smt");
 const { createSmtSessionStore } = require("./smtSessionStore.service");
 const { scheduleDataChangePush } = require("../realtime/realtimeEmitter");
 const { fmtCentralDate } = require("../utils/dateUtils");
+// Lazy-loaded to avoid circular dependency issues at startup
+let _notificationService = null;
+function _getNotificationService() {
+  if (!_notificationService) {
+    _notificationService = require("./notification.service");
+  }
+  return _notificationService;
+}
 
 const SESSION_TTL_SECONDS = Number(process.env.SMT_SESSION_TTL_SECONDS || 7200);
 const SYNC_INTERVAL_MS = Number(process.env.SMT_SYNC_INTERVAL_MS || 30 * 60 * 1000); // 30 min default
@@ -206,12 +214,29 @@ async function syncUserDailyUsage(user) {
     // Success – reset failure counter so future transient errors get a fresh budget
     if (result.success) {
       userModel.resetSyncFailures(user.id);
+
+      // Evaluate notification rules after successful data sync
+      try {
+        const notifications = await _getNotificationService().evaluateAfterSync(user.id);
+        if (notifications.length > 0) {
+          console.log(`[sync] User ${user.id}: generated ${notifications.length} notification(s)`);
+        }
+      } catch (notifErr) {
+        console.warn(`[sync] User ${user.id}: notification eval failed (non-fatal):`, notifErr.message);
+      }
     }
 
     return result;
   } catch (error) {
     userModel.incrementSyncFailures(user.id);
-    console.error(`[sync] User ${user.id} sync failed (failures: ${user.sync_fail_count + 1}):`, error.message);
+    const failCount = (user.sync_fail_count || 0) + 1;
+    console.error(`[sync] User ${user.id} sync failed (failures: ${failCount}):`, error.message);
+
+    // If sync was just disabled by incrementSyncFailures, notify the user
+    if (userModel.isSyncDisabled(user.id)) {
+      try { _getNotificationService().notifySyncDisabled(user.id); } catch (_) { /* best-effort */ }
+    }
+
     return { success: false, reason: error.message };
   }
 }

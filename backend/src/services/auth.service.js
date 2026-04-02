@@ -1,6 +1,15 @@
 const jwt = require("jsonwebtoken");
 const userModel = require("../models/user.model");
 
+// Lazy-require to break circular dependency:
+// auth.service → notification.service → wsGateway → auth.service
+function _notifySyncResumed(userId) {
+  try {
+    const { notifySyncResumed } = require("./notification.service");
+    notifySyncResumed(userId);
+  } catch (_) { /* best-effort */ }
+}
+
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   (process.env.NODE_ENV === "production" ? "" : "dev-jwt-secret-change-in-prod");
@@ -15,6 +24,14 @@ if (process.env.NODE_ENV === "production" && !JWT_SECRET) {
  * We verify SMT credentials first (done by caller), then store them.
  */
 function registerOrUpdate({ smtUsername, smtPassword, esiid, meterNumber }) {
+  // Check if sync was previously disabled (to send "resumed" notification)
+  const wasSyncDisabled = userModel.isSyncDisabled(
+    // Look up user to check current state before reset
+    (userModel.findByUsernameAndEsiid(smtUsername, esiid) ||
+     require("../db/database").getDb().prepare("SELECT id FROM users WHERE smt_username = ?").get(smtUsername)
+    )?.id
+  );
+
   const { id, created } = userModel.upsertUser({
     smtUsername,
     smtPassword,
@@ -24,6 +41,11 @@ function registerOrUpdate({ smtUsername, smtPassword, esiid, meterNumber }) {
 
   // Successful login/registration → reset any sync failure state
   userModel.resetSyncFailures(id);
+
+  // Notify user that sync has resumed if it was previously disabled
+  if (wasSyncDisabled && !created) {
+    _notifySyncResumed(id);
+  }
 
   const token = signToken(id);
   return { userId: id, token, created };

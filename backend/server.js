@@ -4,6 +4,7 @@ const app = require("./src/app");
 const { getDb } = require("./src/db/database");
 const { startBackgroundSync } = require("./src/services/sync.service");
 const { initWsGateway } = require("./src/realtime/wsGateway");
+const { startWeeklySummaryScheduler } = require("./src/services/notification.service");
 
 const PORT = process.env.PORT || 3000;
 
@@ -30,4 +31,7 @@ httpServer.listen(PORT, () => {
   if (process.env.SMT_SYNC_ENABLED !== "false") {
     startBackgroundSync();
   }
+
+  // Start notification schedulers (weekly summaries, purge)
+  startWeeklySummaryScheduler();
 });
