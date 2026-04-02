@@ -177,36 +177,48 @@ function runMigrations(db) {
     console.log("[db] Migration: added sync_fail_count & sync_disabled_at to users.");
   }
 
-  // ── Seed default providers if table empty ──
-  const hasProviders = db.prepare("SELECT COUNT(1) AS c FROM providers").get().c;
-  if (!hasProviders) {
-    const stmt = db.prepare(`
+  // ── Seed / backfill default providers (insert missing, update existing) ──
+  const defaultProviders = [
+    ["Gexa Energy", 8.0, 11.2, "Bill Credit", 12, "$150"],
+    ["Cirro Energy", 8.1, 11.5, "Tiered", 12, "$150"],
+    ["4Change Energy", 8.3, 10.9, "Value Fixed", 12, "$135"],
+    ["Rhythm Energy", 8.4, 11.0, "100% Renewable", 12, "$0"],
+    ["Champion Energy", 8.6, 11.3, "Fixed", 12, "$150"],
+    ["Discount Power", 8.7, 11.4, "Fixed", 12, "$150"],
+    ["Amigo Energy", 8.8, 11.6, "Fixed", 12, "$150"],
+    ["Payless Power", 8.9, 12.2, "Prepaid", 1, "$0"],
+    ["First Choice Power", 9.0, 11.8, "Fixed", 12, "$150"],
+    ["Just Energy", 9.2, 12.1, "Fixed Green", 12, "$175"],
+    ["TriEagle Energy", 9.3, 11.7, "Fixed", 24, "$200"],
+    ["Spark Energy", 9.4, 12.0, "Fixed", 12, "$150"],
+    ["Reliant Energy", 11.9, 14.8, "Fixed / Free Weekends", 12, "$150"],
+    ["TXU Energy", 11.5, 15.1, "Fixed / Free Nights", 12, "$150"],
+    ["Green Mountain", 12.3, 15.9, "100% Renewable", 12, "$150"],
+    ["Direct Energy", 14.9, 16.5, "Simple Fixed", 12, "$135"],
+  ];
+  {
+    const upsertStmt = db.prepare(`
       INSERT INTO providers
         (name, energy_rate_cents, avg_all_in_cents, plan_type, term_months, cancellation_fee)
-      VALUES (?, ?, ?, ?, ?, ?)`);
-    const rows = [
-      ["Gexa Energy", 8.0, 11.2, "Bill Credit", 12, "$150"],
-      ["Cirro Energy", 8.1, 11.5, "Tiered", 12, "$150"],
-      ["4Change Energy", 8.3, 10.9, "Value Fixed", 12, "$135"],
-      ["Rhythm Energy", 8.4, 11.0, "100% Renewable", 12, "$0"],
-      ["Champion Energy", 8.6, 11.3, "Fixed", 12, "$150"],
-      ["Discount Power", 8.7, 11.4, "Fixed", 12, "$150"],
-      ["Amigo Energy", 8.8, 11.6, "Fixed", 12, "$150"],
-      ["Payless Power", 8.9, 12.2, "Prepaid", 1, "$0"],
-      ["First Choice Power", 9.0, 11.8, "Fixed", 12, "$150"],
-      ["Just Energy", 9.2, 12.1, "Fixed Green", 12, "$175"],
-      ["TriEagle Energy", 9.3, 11.7, "Fixed", 24, "$200"],
-      ["Spark Energy", 9.4, 12.0, "Fixed", 12, "$150"],
-      ["Reliant Energy", 11.9, 14.8, "Fixed / Free Weekends", 12, "$150"],
-      ["TXU Energy", 11.5, 15.1, "Fixed / Free Nights", 12, "$150"],
-      ["Green Mountain", 12.3, 15.9, "100% Renewable", 12, "$150"],
-      ["Direct Energy", 14.9, 16.5, "Simple Fixed", 12, "$135"],
-    ];
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(name) DO UPDATE SET
+        avg_all_in_cents  = COALESCE(excluded.avg_all_in_cents,  avg_all_in_cents),
+        plan_type         = COALESCE(excluded.plan_type,         plan_type),
+        term_months       = COALESCE(excluded.term_months,       term_months),
+        cancellation_fee  = COALESCE(excluded.cancellation_fee,  cancellation_fee),
+        updated_at        = datetime('now')
+    `);
     const tx = db.transaction(() => {
-      rows.forEach((r) => stmt.run(...r));
+      let inserted = 0;
+      for (const r of defaultProviders) {
+        const changes = upsertStmt.run(...r).changes;
+        if (changes > 0) inserted++;
+      }
+      if (inserted > 0) {
+        console.log(`[db] Upserted ${inserted} default provider(s).`);
+      }
     });
     tx();
-    console.log("[db] Seeded default providers.");
   }
 }
 
