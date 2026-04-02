@@ -27,15 +27,10 @@ app.use(
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      // Allow http://localhost on any port (for Flutter web dev)
+      // Allow localhost / 127.0.0.1 on any port (Flutter web dev uses random ports)
       try {
         const parsed = new URL(origin);
-        if (
-          parsed.hostname === "localhost" &&
-          allowedOrigins.some((o) => {
-            try { return new URL(o).hostname === "localhost"; } catch { return false; }
-          })
-        ) {
+        if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
           return callback(null, true);
         }
       } catch { /* invalid origin, fall through to block */ }

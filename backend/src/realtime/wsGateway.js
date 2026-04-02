@@ -46,7 +46,17 @@ function _isOriginAllowed(origin, allowedOrigins) {
   if (!allowedOrigins || allowedOrigins.length === 0) {
     return process.env.NODE_ENV !== "production";
   }
-  return allowedOrigins.includes(origin);
+  if (allowedOrigins.includes(origin)) return true;
+
+  // Allow localhost on any port (Flutter web dev server uses random ports).
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
+      return true;
+    }
+  } catch { /* invalid origin */ }
+
+  return false;
 }
 
 function _broadcastToUser(userId, message) {
